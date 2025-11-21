@@ -75,6 +75,14 @@ def main():
         print(f"Copying toolbox directory to kdtree...")
         shutil.copytree(toolbox_src, kdtree_dest)
         
+        # Compile MEX files using kdtree_compile.m
+        print("Compiling MEX files using kdtree_compile.m...")
+        compile_command = f"cd('{kdtree_dest}'); kdtree_compile"
+        subprocess.run(
+            ["matlab", "-batch", compile_command],
+            check=True
+        )
+        
         # Collect exposed symbols from kdtree directory (including .cpp files)
         print("Collecting exposed symbols...")
         exposed_symbols = collect_kdtree_symbols(kdtree_dest)
