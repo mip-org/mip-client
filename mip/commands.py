@@ -17,84 +17,153 @@ def get_mip_dir():
     return home / '.mip' / 'packages'
 
 
-def install_package(package_name, _installing_stack=None):
+def _build_dependency_graph(package_name, manifest, visited=None, path=None):
+    """Recursively build a dependency graph for a package
+    
+    Args:
+        package_name: Name of the package
+        manifest: The parsed packages.json manifest
+        visited: Set of already visited packages (for cycle detection)
+        path: Current path (for cycle detection)
+    
+    Returns:
+        List of package names in dependency order (dependencies first)
+    """
+    if visited is None:
+        visited = set()
+    if path is None:
+        path = []
+    
+    # Check for circular dependency
+    if package_name in path:
+        cycle = ' -> '.join(path + [package_name])
+        print(f"Error: Circular dependency detected: {cycle}")
+        sys.exit(1)
+    
+    # If already visited, skip
+    if package_name in visited:
+        return []
+    
+    # Find package in manifest
+    package_info = None
+    for pkg in manifest.get('packages', []):
+        if pkg.get('name') == package_name:
+            package_info = pkg
+            break
+    
+    if not package_info:
+        print(f"Error: Package '{package_name}' not found in repository")
+        sys.exit(1)
+    
+    visited.add(package_name)
+    path.append(package_name)
+    
+    # Collect all dependencies first
+    result = []
+    for dep in package_info.get('dependencies', []):
+        result.extend(_build_dependency_graph(dep, manifest, visited, path[:]))
+    
+    # Then add this package
+    result.append(package_name)
+    
+    return result
+
+
+def _download_and_install(package_name, package_info, mip_dir):
+    """Download and install a single package
+    
+    Args:
+        package_name: Name of the package
+        package_info: Package info from manifest
+        mip_dir: The mip directory path
+    """
+    package_dir = mip_dir / package_name
+    
+    # Get filename
+    mhl_filename = package_info['filename']
+    
+    # Download the .mhl file
+    mhl_url = f"https://magland.github.io/mip/packages/{mhl_filename}"
+    print(f"Downloading {package_name} v{package_info['version']}...")
+    
+    # Create temporary file for download
+    mhl_path = mip_dir / f"{package_name}.mhl"
+    request.urlretrieve(mhl_url, mhl_path)
+    
+    # Extract the .mhl file (which is a zip file)
+    print(f"Extracting {package_name}...")
+    with zipfile.ZipFile(mhl_path, 'r') as zip_ref:
+        zip_ref.extractall(package_dir)
+    
+    # Clean up .mhl file
+    mhl_path.unlink()
+    
+    print(f"Successfully installed '{package_name}'")
+
+
+def install_package(package_name):
     """Install a package from the mip repository
     
     Args:
         package_name: Name of the package to install
-        _installing_stack: Internal parameter to track installation chain for circular dependency detection
     """
-    if _installing_stack is None:
-        _installing_stack = []
-    
-    # Check for circular dependencies
-    if package_name in _installing_stack:
-        cycle = ' -> '.join(_installing_stack + [package_name])
-        print(f"Error: Circular dependency detected: {cycle}")
-        sys.exit(1)
-    
     mip_dir = get_mip_dir()
-    package_dir = mip_dir / package_name
+    mip_dir.mkdir(parents=True, exist_ok=True)
     
-    # Check if already installed
-    if package_dir.exists():
-        print(f"Package '{package_name}' is already installed")
-        return
-    
-    # Add to installation stack for circular dependency detection
-    _installing_stack.append(package_name)
-    
-    # Try to download the package
-    url = f"https://magland.github.io/mip/{package_name}.zip"
-    print(f"Downloading {package_name} from {url}...")
+    # Download and parse the packages.json manifest
+    manifest_url = "https://magland.github.io/mip/packages.json"
+    print(f"Fetching package manifest...")
     
     try:
-        # Create temporary file for download
-        zip_path = mip_dir / f"{package_name}.zip"
-        mip_dir.mkdir(parents=True, exist_ok=True)
+        # Download manifest
+        with request.urlopen(manifest_url) as response:
+            manifest_content = response.read().decode('utf-8')
         
-        # Download the file
-        request.urlretrieve(url, zip_path)
+        # Parse JSON manifest
+        manifest = json.loads(manifest_content)
         
-        # Extract the zip file
-        print(f"Extracting {package_name}...")
-        with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-            zip_ref.extractall(package_dir)
+        # Build dependency graph (returns packages in install order)
+        print(f"Resolving dependencies for '{package_name}'...")
+        install_order = _build_dependency_graph(package_name, manifest)
         
-        # Clean up zip file
-        zip_path.unlink()
+        # Filter out already installed packages
+        to_install = []
+        package_info_map = {pkg['name']: pkg for pkg in manifest.get('packages', [])}
         
-        # Check for dependencies in mip.json
-        mip_json_path = package_dir / "mip.json"
-        if mip_json_path.exists():
-            try:
-                with open(mip_json_path, 'r') as f:
-                    mip_config = json.load(f)
-                
-                dependencies = mip_config.get('dependencies', [])
-                if dependencies:
-                    print(f"Installing dependencies for '{package_name}': {', '.join(dependencies)}")
-                    for dep in dependencies:
-                        install_package(dep, _installing_stack.copy())
-            except json.JSONDecodeError as e:
-                print(f"Warning: Could not parse mip.json for '{package_name}': {e}")
-            except Exception as e:
-                print(f"Warning: Error processing dependencies for '{package_name}': {e}")
+        for pkg_name in install_order:
+            package_dir = mip_dir / pkg_name
+            if package_dir.exists():
+                print(f"Package '{pkg_name}' is already installed")
+            else:
+                to_install.append(pkg_name)
         
-        print(f"Successfully installed '{package_name}'")
+        if not to_install:
+            print(f"All packages already installed")
+            return
+        
+        # Show installation plan
+        if len(to_install) > 1:
+            print(f"\nInstallation plan:")
+            for pkg_name in to_install:
+                pkg_info = package_info_map[pkg_name]
+                print(f"  - {pkg_name} v{pkg_info['version']}")
+            print()
+        
+        # Install each package in order
+        for pkg_name in to_install:
+            pkg_info = package_info_map[pkg_name]
+            _download_and_install(pkg_name, pkg_info, mip_dir)
+        
+        print(f"\nSuccessfully installed {len(to_install)} package(s)")
         
     except HTTPError as e:
-        print(f"Error: Could not download package '{package_name}' (HTTP {e.code})")
-        print(f"URL: {url}")
+        print(f"Error: Could not download (HTTP {e.code})")
         sys.exit(1)
     except URLError as e:
-        print(f"Error: Could not download package '{package_name}': {e.reason}")
+        print(f"Error: Could not connect to package repository: {e.reason}")
         sys.exit(1)
     except Exception as e:
         print(f"Error: Failed to install package '{package_name}': {e}")
-        # Clean up if something went wrong
-        if package_dir.exists():
-            shutil.rmtree(package_dir)
         sys.exit(1)
 
 

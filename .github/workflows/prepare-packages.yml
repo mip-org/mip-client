@@ -44,18 +44,21 @@ jobs:
       - name: Run prepare_flam.py
         run: python scripts/prepare_flam.py
 
-      - name: Create packages directory
+      - name: Create deploy directory structure
         run: |
-          mkdir -p packages
-          mv chebfun.zip packages/
-          mv export_fig.zip packages/
-          mv surfacefun.zip packages/
-          mv flam.zip packages/
+          mkdir -p deploy/packages
+          mv chebfun-latest-any-none-any.mhl deploy/packages/
+          mv export_fig-3.54-any-none-any.mhl deploy/packages/
+          mv surfacefun-latest-any-none-any.mhl deploy/packages/
+          mv flam-latest-any-none-any.mhl deploy/packages/
+
+      - name: Generate manifest
+        run: python scripts/generate_manifest.py
 
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: packages
+          path: deploy
 
   deploy:
     environment:

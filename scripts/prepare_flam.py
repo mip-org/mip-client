@@ -2,12 +2,14 @@
 import subprocess
 import shutil
 import os
-import json
+import zipfile
+import tempfile
 
 def main():
     repo_url = "https://github.com/klho/FLAM.git"
     clone_dir = "FLAM"
-    output_file = "flam.zip"
+    # Follow Python wheel naming convention: {package}-{version}-{matlab_tag}-{abi_tag}-{platform_tag}.mhl
+    output_file = "flam-latest-any-none-any.mhl"
     
     # Remove clone directory if it exists
     if os.path.exists(clone_dir):
@@ -29,22 +31,41 @@ def main():
             shutil.rmtree(git_dir)
             dirs.remove(".git")
     
-    # Create mip.json with dependencies
-    print("Creating mip.json with dependencies...")
-    mip_json_path = os.path.join(clone_dir, "mip.json")
-    mip_config = {
-        "dependencies": []
-    }
-    with open(mip_json_path, 'w') as f:
-        json.dump(mip_config, f, indent=2)
-    
-    # Create zip file
-    print(f"Creating {output_file}...")
-    shutil.make_archive("flam", 'zip', clone_dir, '.')
-    
-    # Clean up cloned directory
-    print(f"Cleaning up {clone_dir} directory...")
-    shutil.rmtree(clone_dir)
+    # Create a temporary directory for building the .mhl
+    with tempfile.TemporaryDirectory() as temp_dir:
+        # Create the .mhl structure directory
+        mhl_build_dir = os.path.join(temp_dir, "mhl_build")
+        os.makedirs(mhl_build_dir)
+        
+        # Move FLAM to flam in the build directory (lowercase for consistency)
+        flam_dir = os.path.join(mhl_build_dir, "flam")
+        print(f"Moving FLAM to flam...")
+        shutil.move(clone_dir, flam_dir)
+        
+        # Create import.m file
+        import_m_path = os.path.join(mhl_build_dir, "import.m")
+        print("Creating import.m...")
+        with open(import_m_path, 'w') as f:
+            f.write("% Add flam to the MATLAB path and run startup\n")
+            f.write("flam_path = fullfile(fileparts(mfilename('fullpath')), 'flam');\n")
+            f.write("addpath(flam_path);\n")
+            f.write("startup_file = fullfile(flam_path, 'startup.m');\n")
+            f.write("if exist(startup_file, 'file')\n")
+            f.write("    run(startup_file);\n")
+            f.write("end\n")
+        
+        # Create the .mhl file (which is a zip file)
+        print(f"Creating {output_file}...")
+        with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as mhl_zip:
+            # Add import.m
+            mhl_zip.write(import_m_path, 'import.m')
+            
+            # Add all files in the flam directory
+            for root, dirs, files in os.walk(flam_dir):
+                for file in files:
+                    file_path = os.path.join(root, file)
+                    arcname = os.path.relpath(file_path, mhl_build_dir)
+                    mhl_zip.write(file_path, arcname)
     
     print(f"Created {output_file} successfully!")
 

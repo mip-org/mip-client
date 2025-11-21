@@ -4,8 +4,8 @@ function import(packageName, varargin)
     % Usage:
     %   mip.import('packageName')
     %
-    % This function adds the specified package from ~/.mip/packages to the
-    % MATLAB path for the current session only.
+    % This function imports the specified package from ~/.mip/packages by
+    % executing its import.m file.
     
     % Parse optional arguments for internal use
     p = inputParser;
@@ -30,30 +30,23 @@ function import(packageName, varargin)
         homeDir = getenv('USERPROFILE');
     end
     
-    mipDir = fullfile(homeDir, '.mip', 'packages', packageName);
+    packageDir = fullfile(homeDir, '.mip', 'packages', packageName);
     
     % Check if package exists
-    if ~exist(mipDir, 'dir')
+    if ~exist(packageDir, 'dir')
         error('mip:packageNotFound', ...
               'Package "%s" is not installed. Run "mip install %s" first.', ...
               packageName, packageName);
     end
     
-    % Check if there's a single nested directory (common in GitHub zips)
-    % If so, use that directory instead of the top level
-    contents = dir(mipDir);
-    contents = contents(~ismember({contents.name}, {'.', '..'}));
-    
-    if length(contents) == 1 && contents(1).isdir
-        % There's a single subdirectory, use that as the actual package path
-        actualPackageDir = fullfile(mipDir, contents(1).name);
-    else
-        % Use the directory as-is
-        actualPackageDir = mipDir;
+    % Check if package is already imported
+    if isPackageImported(packageName)
+        fprintf('Package "%s" is already imported\n', packageName);
+        return;
     end
     
     % Check for mip.json and process dependencies
-    mipJsonPath = fullfile(actualPackageDir, 'mip.json');
+    mipJsonPath = fullfile(packageDir, 'mip.json');
     if exist(mipJsonPath, 'file')
         try
             % Read and parse mip.json
@@ -68,8 +61,7 @@ function import(packageName, varargin)
                         packageName, strjoin(mipConfig.dependencies, ', '));
                 for i = 1:length(mipConfig.dependencies)
                     dep = mipConfig.dependencies{i};
-                    % Check if already on path to avoid duplicate imports
-                    if ~isPackageOnPath(dep)
+                    if ~isPackageImported(dep)
                         mip.import(dep, 'importingStack', importingStack);
                     else
                         fprintf('  Dependency "%s" is already imported\n', dep);
@@ -83,78 +75,46 @@ function import(packageName, varargin)
         end
     end
     
-    % Check if package is already on path
-    if isPackageOnPath(packageName)
-        fprintf('Package "%s" is already imported\n', packageName);
-        return;
+    % Look for import.m file
+    importFile = fullfile(packageDir, 'import.m');
+    if ~exist(importFile, 'file')
+        error('mip:importNotFound', ...
+              'Package "%s" does not have an import.m file', packageName);
     end
     
-    % Add to path (current session only)
-    addpath(actualPackageDir);
-    fprintf('Added "%s" to MATLAB path\n', actualPackageDir);
-
-    % Check for a setup.m file
-    % If it exists, change to that directory, run setup, then return
-    setupFile = fullfile(actualPackageDir, 'setup.m');
-    if exist(setupFile, 'file')
-        originalDir = pwd;
-        cd(actualPackageDir);
-        try
-            setup;  % Call the setup function
-            fprintf('Executed setup.m for package "%s"\n', packageName);
-        catch ME
-            warning('mip:setupError', ...
-                    'Error executing setup.m for package "%s": %s', ...
-                    packageName, ME.message);
-        end
-        cd(originalDir);
+    % Execute the import.m file
+    originalDir = pwd;
+    cd(packageDir);
+    try
+        run(importFile);
+        fprintf('Imported package "%s"\n', packageName);
+    catch ME
+        warning('mip:importError', ...
+                'Error executing import.m for package "%s": %s', ...
+                packageName, ME.message);
     end
-
-    % Check for a startup.m file
-    % If it exists, change to that directory, run startup, then return
-    startupFile = fullfile(actualPackageDir, 'startup.m');
-    if exist(startupFile, 'file')
-        originalDir = pwd;
-        cd(actualPackageDir);
-        try
-            startup;  % Call the startup function
-            fprintf('Executed startup.m for package "%s"\n', packageName);
-        catch ME
-            warning('mip:startupError', ...
-                    'Error executing startup.m for package "%s": %s', ...
-                    packageName, ME.message);
-        end
-        cd(originalDir);
-    end
-
+    cd(originalDir);
+    
+    % Mark package as imported
+    markPackageAsImported(packageName);
 end
 
-function onPath = isPackageOnPath(packageName)
-    % Helper function to check if a package is already on the MATLAB path
-    homeDir = getenv('HOME');
-    if isempty(homeDir)
-        homeDir = getenv('USERPROFILE');
+function imported = isPackageImported(packageName)
+    % Helper function to check if a package has already been imported
+    global MIP_IMPORTED_PACKAGES;
+    if isempty(MIP_IMPORTED_PACKAGES)
+        MIP_IMPORTED_PACKAGES = {};
     end
-    
-    mipDir = fullfile(homeDir, '.mip', 'packages', packageName);
-    
-    % Check if package exists
-    if ~exist(mipDir, 'dir')
-        onPath = false;
-        return;
+    imported = ismember(packageName, MIP_IMPORTED_PACKAGES);
+end
+
+function markPackageAsImported(packageName)
+    % Helper function to mark a package as imported
+    global MIP_IMPORTED_PACKAGES;
+    if isempty(MIP_IMPORTED_PACKAGES)
+        MIP_IMPORTED_PACKAGES = {};
     end
-    
-    % Check for nested directory structure
-    contents = dir(mipDir);
-    contents = contents(~ismember({contents.name}, {'.', '..'}));
-    
-    if length(contents) == 1 && contents(1).isdir
-        actualPackageDir = fullfile(mipDir, contents(1).name);
-    else
-        actualPackageDir = mipDir;
+    if ~ismember(packageName, MIP_IMPORTED_PACKAGES)
+        MIP_IMPORTED_PACKAGES{end+1} = packageName;
     end
-    
-    % Check if this directory is on the path
-    pathDirs = strsplit(path, pathsep);
-    onPath = any(strcmp(actualPackageDir, pathDirs));
 end
