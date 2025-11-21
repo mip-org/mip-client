@@ -60,6 +60,13 @@ def main():
         if package_info:
             packages.append(package_info)
     
+    packages.append({
+        "name": "fmm2d",
+        "filename": "http://users.flatironinstitute.org/~magland/mip/packages/fmm2d-latest-any-none-any.mhl",
+        "version": "latest",
+        "dependencies": []
+    })
+    
     # Create manifest
     manifest = {
         "packages": packages

@@ -112,7 +112,11 @@ def _download_and_install(package_name, package_info, mip_dir):
     mhl_filename = package_info['filename']
     
     # Download the .mhl file
-    mhl_url = f"https://magland.github.io/mip/packages/{mhl_filename}"
+    # If filename starts with https:// or http://, use it directly as the URL
+    if mhl_filename.startswith('https://') or mhl_filename.startswith('http://'):
+        mhl_url = mhl_filename
+    else:
+        mhl_url = f"https://magland.github.io/mip/packages/{mhl_filename}"
     print(f"Downloading {package_name} v{package_info['version']}...")
     
     # Create temporary file for download
