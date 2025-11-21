@@ -53,6 +53,12 @@ mip uninstall package_name
 
 Removes an installed package after confirmation.
 
+Currently, the supported packages are:
+- [export_fig](https://github.com/altmany/export_fig)
+- [chebfun](https://github.com/chebfun/chebfun)
+- [surfacefun](https://github.com/danfortunato/surfacefun) - depends on chebfun
+- [FLAM](https://github.com/klho/FLAM)
+
 ### List installed packages
 
 ```bash
@@ -75,7 +81,7 @@ mip.import('package_name')
 ## Package Structure
 
 - Packages are stored in `~/.mip/packages/`
-- Each package is extracted from a zip file into its own directory
+- Each package is extracted from a zip (.mhl) file into its own directory
 - The `+mip` MATLAB namespace is installed in `~/.mip/matlab/+mip/`
 
 ## Examples
@@ -92,15 +98,18 @@ matlab
 >> mip.import('surfacefun')
 >> % Now use the toolbox functions
 
-# Uninstall when done
+# Uninstall
 mip uninstall surfacefun
 ```
 
 ## Requirements
 
 - Python 3.6+
-- MATLAB (for `mip setup` and using packages in MATLAB)
-- requests library (installed automatically)
+- MATLAB
+
+## Authors
+
+Jeremy Magland and Dan Fortunato - Center for Computational Mathematics, Flatiron Institute
 
 ## License
 
