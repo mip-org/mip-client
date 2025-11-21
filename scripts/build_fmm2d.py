@@ -56,24 +56,24 @@ def main():
         check=True
     )
     
-    # Modify Makefile to replace -march=native with -march=x86-64
-    print("Modifying Makefile to use -march=x86-64...")
-    makefile_path = os.path.join(clone_dir, "Makefile")
+    # Modify makefile to replace -march=native with -march=x86-64
+    print("Modifying makefile to use -march=x86-64...")
+    makefile_path = os.path.join(clone_dir, "makefile")
     if not os.path.exists(makefile_path):
-        raise RuntimeError(f"Makefile not found at {makefile_path}")
+        raise RuntimeError(f"makefile not found at {makefile_path}")
     
     with open(makefile_path, 'r') as f:
         makefile_content = f.read()
     
     if '-march=native' not in makefile_content:
-        raise RuntimeError("Could not find '-march=native' in Makefile")
+        raise RuntimeError("Could not find '-march=native' in makefile")
     
     modified_content = makefile_content.replace('-march=native', '-march=x86-64')
     
     with open(makefile_path, 'w') as f:
         f.write(modified_content)
     
-    print("Makefile modified successfully")
+    print("makefile modified successfully")
     
     # Run 'make matlab' in the cloned directory
     print("Running 'make matlab'...")
