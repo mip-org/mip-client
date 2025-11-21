@@ -52,10 +52,13 @@ jobs:
       - name: Clone kdtree repository
         run: git clone https://github.com/taiya/kdtree.git
 
+      - name: Copy custom compilation script
+        run: cp scripts/kdtree_compile_cpp14.m kdtree/toolbox/
+
       - name: Compile kdtree MEX files
         uses: matlab-actions/run-command@v2
         with:
-          command: cd('kdtree/toolbox'); kdtree_compile;
+          command: cd('kdtree/toolbox'); kdtree_compile_cpp14;
 
       - name: Run build_kdtree.py
         run: python scripts/build_kdtree.py
