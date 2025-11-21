@@ -42,10 +42,10 @@ def main():
         print(f"Moving surfacefun...")
         shutil.move(clone_dir, surfacefun_dir)
         
-        # Create import.m file
-        import_m_path = os.path.join(mhl_build_dir, "import.m")
-        print("Creating import.m...")
-        with open(import_m_path, 'w') as f:
+        # Create setup.m file
+        setup_m_path = os.path.join(mhl_build_dir, "setup.m")
+        print("Creating setup.m...")
+        with open(setup_m_path, 'w') as f:
             f.write("% Add surfacefun to the MATLAB path and run setup\n")
             f.write("surfacefun_path = fullfile(fileparts(mfilename('fullpath')), 'surfacefun');\n")
             f.write("addpath(surfacefun_path);\n")
@@ -67,8 +67,8 @@ def main():
         # Create the .mhl file (which is a zip file)
         print(f"Creating {output_file}...")
         with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as mhl_zip:
-            # Add import.m
-            mhl_zip.write(import_m_path, 'import.m')
+            # Add setup.m
+            mhl_zip.write(setup_m_path, 'setup.m')
             
             # Add mip.json
             mhl_zip.write(mip_json_path, 'mip.json')

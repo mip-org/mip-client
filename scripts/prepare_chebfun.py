@@ -37,10 +37,10 @@ def main():
         print(f"Moving chebfun-master to chebfun...")
         shutil.move(extracted_dir, chebfun_dir)
         
-        # Create import.m file
-        import_m_path = os.path.join(mhl_build_dir, "import.m")
-        print("Creating import.m...")
-        with open(import_m_path, 'w') as f:
+        # Create setup.m file
+        setup_m_path = os.path.join(mhl_build_dir, "setup.m")
+        print("Creating setup.m...")
+        with open(setup_m_path, 'w') as f:
             f.write("% Add chebfun to the MATLAB path\n")
             f.write("chebfun_path = fullfile(fileparts(mfilename('fullpath')), 'chebfun');\n")
             f.write("addpath(chebfun_path);\n")
@@ -48,8 +48,8 @@ def main():
         # Create the .mhl file (which is a zip file)
         print(f"Creating {output_file}...")
         with zipfile.ZipFile(output_file, 'w', zipfile.ZIP_DEFLATED) as mhl_zip:
-            # Add import.m
-            mhl_zip.write(import_m_path, 'import.m')
+            # Add setup.m
+            mhl_zip.write(setup_m_path, 'setup.m')
             
             # Add all files in the chebfun directory
             for root, dirs, files in os.walk(chebfun_dir):

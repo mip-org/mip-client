@@ -5,7 +5,7 @@ function import(packageName, varargin)
     %   mip.import('packageName')
     %
     % This function imports the specified package from ~/.mip/packages by
-    % executing its import.m file.
+    % executing its setup.m file.
     
     % Parse optional arguments for internal use
     p = inputParser;
@@ -75,22 +75,22 @@ function import(packageName, varargin)
         end
     end
     
-    % Look for import.m file
-    importFile = fullfile(packageDir, 'import.m');
-    if ~exist(importFile, 'file')
-        error('mip:importNotFound', ...
-              'Package "%s" does not have an import.m file', packageName);
+    % Look for setup.m file
+    setupFile = fullfile(packageDir, 'setup.m');
+    if ~exist(setupFile, 'file')
+        error('mip:setupNotFound', ...
+              'Package "%s" does not have a setup.m file', packageName);
     end
     
-    % Execute the import.m file
+    % Execute the setup.m file
     originalDir = pwd;
     cd(packageDir);
     try
-        run(importFile);
+        run(setupFile);
         fprintf('Imported package "%s"\n', packageName);
     catch ME
-        warning('mip:importError', ...
-                'Error executing import.m for package "%s": %s', ...
+        warning('mip:setupError', ...
+                'Error executing setup.m for package "%s": %s', ...
                 packageName, ME.message);
     end
     cd(originalDir);
