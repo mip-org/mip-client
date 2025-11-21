@@ -17,9 +17,7 @@ concurrency:
 
 jobs:
   build:
-    # we need to compile mex on an older system so that the binaries are compatible with more matlab installations
-    # runs-on: ubuntu-latest
-    runs-on: ubuntu-20.04
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -32,6 +30,7 @@ jobs:
       - name: Set up MATLAB
         uses: matlab-actions/setup-matlab@v2
         with:
+          release: R2024a
           cache: true
       
       - name: Install dependencies
