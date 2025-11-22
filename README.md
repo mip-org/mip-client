@@ -44,6 +44,8 @@ addpath('~/.mip/matlab')
 
 ### Install a package
 
+Either from the command line or from within MATLAB, run:
+
 ```bash
 mip install package_name
 ```
@@ -65,6 +67,9 @@ After setting up the MATLAB path and installing packages, you can import them in
 ```matlab
 % Import a package (adds it to the path for the current session)
 mip.import('package_name')
+
+% or
+mip import package_name
 
 % Now you can use the package functions
 ```
@@ -103,7 +108,7 @@ mip list
 
 # Use in MATLAB
 matlab
->> mip.import('surfacefun')
+>> mip import surfacefun
 >> % Now use the toolbox functions
 
 # Uninstall
@@ -112,7 +117,7 @@ mip uninstall surfacefun
 
 ## How to add new packages
 
-For now mip supports a very limited set of packages, which are built as part of this repository. To add a new package, you should submit a pull request with a new script in `scripts/` and also modify the `.github/workflows/prepare-packages.yml` file to include the new package in the build process. Once your pull request is merged, your package will be automatically built and hosted.
+For now mip supports a very limited set of packages, which are built as part of this repository. To add a new package, you should submit a pull request to https://github.com/mip-org/mip-core.
 
 ## Requirements
 
