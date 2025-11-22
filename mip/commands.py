@@ -46,12 +46,12 @@ def _ensure_mip_matlab_setup():
         print(f"Warning: Failed to update MATLAB integration: {e}")
 
 
-def _build_dependency_graph(package_name, manifest, visited=None, path=None):
+def _build_dependency_graph(package_name, index, visited=None, path=None):
     """Recursively build a dependency graph for a package
     
     Args:
         package_name: Name of the package
-        manifest: The parsed packages.json manifest
+        index: The parsed package index
         visited: Set of already visited packages (for cycle detection)
         path: Current path (for cycle detection)
     
@@ -72,10 +72,10 @@ def _build_dependency_graph(package_name, manifest, visited=None, path=None):
     # If already visited, skip
     if package_name in visited:
         return []
-    
-    # Find package in manifest
+
+    # Find package in index
     package_info = None
-    for pkg in manifest.get('packages', []):
+    for pkg in index.get('packages', []):
         if pkg.get('name') == package_name:
             package_info = pkg
             break
@@ -90,8 +90,8 @@ def _build_dependency_graph(package_name, manifest, visited=None, path=None):
     # Collect all dependencies first
     result = []
     for dep in package_info.get('dependencies', []):
-        result.extend(_build_dependency_graph(dep, manifest, visited, path[:]))
-    
+        result.extend(_build_dependency_graph(dep, index, visited, path[:]))
+
     # Then add this package
     result.append(package_name)
     
@@ -103,20 +103,14 @@ def _download_and_install(package_name, package_info, mip_dir):
     
     Args:
         package_name: Name of the package
-        package_info: Package info from manifest
+        package_info: Package info from index
         mip_dir: The mip directory path
     """
     package_dir = mip_dir / package_name
     
     # Get filename
-    mhl_filename = package_info['filename']
+    mhl_url = package_info['mhl_url']
     
-    # Download the .mhl file
-    # If filename starts with https:// or http://, use it directly as the URL
-    if mhl_filename.startswith('https://') or mhl_filename.startswith('http://'):
-        mhl_url = mhl_filename
-    else:
-        mhl_url = f"https://magland.github.io/mip/packages/{mhl_filename}"
     print(f"Downloading {package_name} v{package_info['version']}...")
     
     # Create temporary file for download
@@ -249,27 +243,27 @@ def install_package(package_name):
         return
     
     # Otherwise, proceed with remote repository installation
-    
-    # Download and parse the packages.json manifest
-    manifest_url = "https://magland.github.io/mip/packages.json"
-    print(f"Fetching package manifest...")
+
+    # Download and parse the package index
+    index_url = "https://mip-org.github.io/mip-core/index.json"
+    print(f"Fetching package index...")
     
     try:
-        # Download manifest
-        with request.urlopen(manifest_url) as response:
-            manifest_content = response.read().decode('utf-8')
-        
-        # Parse JSON manifest
-        manifest = json.loads(manifest_content)
-        
+        # Download index
+        with request.urlopen(index_url) as response:
+            index_content = response.read().decode('utf-8')
+
+        # Parse JSON
+        index = json.loads(index_content)
+
         # Build dependency graph (returns packages in install order)
         print(f"Resolving dependencies for '{package_name}'...")
-        install_order = _build_dependency_graph(package_name, manifest)
+        install_order = _build_dependency_graph(package_name, index)
         
         # Filter out already installed packages
         to_install = []
-        package_info_map = {pkg['name']: pkg for pkg in manifest.get('packages', [])}
-        
+        package_info_map = {pkg['name']: pkg for pkg in index.get('packages', [])}
+
         for pkg_name in install_order:
             package_dir = mip_dir / pkg_name
             if package_dir.exists():
