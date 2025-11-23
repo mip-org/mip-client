@@ -24,12 +24,12 @@ def _ensure_mip_matlab_setup():
     """
     try:
         # Get the source +mip directory
-        source_mip = Path(__file__).parent / '+mip'
-        if not source_mip.exists():
+        source_plus_mip = Path(__file__).parent / 'matlab' / '+mip'
+        if not source_plus_mip.exists():
             print("Warning: +mip directory not found in package")
             return
         # Get the source mip.m file
-        source_mip_m = Path(__file__).parent / 'mip.m'
+        source_mip_m = Path(__file__).parent / 'matlab' / 'mip.m'
         if not source_mip_m.exists():
             print("Warning: mip.m file not found in package")
             return
@@ -45,7 +45,7 @@ def _ensure_mip_matlab_setup():
         if dest_plus_mip.exists():
             shutil.rmtree(dest_plus_mip)
         
-        shutil.copytree(source_mip, dest_plus_mip)
+        shutil.copytree(source_plus_mip, dest_plus_mip)
 
         # Copy the mip.m file
         dest_mip_m = home / '.mip' / 'matlab' / 'mip.m'

@@ -23,14 +23,22 @@ function import(packageName, varargin)
     % Add to importing stack for circular dependency detection
     importingStack = [importingStack, {packageName}];
     
-    % Get the mip packages directory
-    homeDir = getenv('HOME');
-    if isempty(homeDir)
-        % Windows fallback
-        homeDir = getenv('USERPROFILE');
+    % Get the mip packages directory based on the location of this import.m file
+    % import.m is located at ~/.mip/matlab/+mip/import.m
+    % We need to go up to ~/.mip/packages/
+    importFileDir = fileparts(mfilename('fullpath'));
+    mipRootDir = fileparts(fileparts(importFileDir));
+    packagesDir = fullfile(mipRootDir, 'packages');
+    
+    % Check if packages directory exists
+    if ~exist(packagesDir, 'dir')
+        error('mip:packagesDirectoryNotFound', ...
+              ['The mip packages directory does not exist: %s\n' ...
+               'Please run "mip setup" from the command line to set up mip.'], ...
+              packagesDir);
     end
     
-    packageDir = fullfile(homeDir, '.mip', 'packages', packageName);
+    packageDir = fullfile(packagesDir, packageName);
     
     % Check if package exists
     if ~exist(packageDir, 'dir')

@@ -46,4 +46,4 @@ packages = ["mip_client"]
 include-package-data = true
 
 [tool.setuptools.package-data]
-mip_client = ["+mip/*.m", "mip.m"]
+mip_client = ["matlab/+mip/*.m", "matlab/mip.m"]
