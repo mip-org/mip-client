@@ -8,17 +8,19 @@ def print_usage():
     print("Usage: mip <command> [arguments]")
     print()
     print("Commands:")
-    print("  install <package>      Install a package from repository, local .mhl file, or URL")
-    print("  uninstall <package>    Uninstall a package")
-    print("  list                   List installed packages")
-    print("  setup                  Set up MATLAB integration")
-    print("  find-name-collisions   Find symbol name collisions across packages")
+    print("  install <package> [...]    Install one or more packages from repository, local .mhl file, or URL")
+    print("  uninstall <package> [...]  Uninstall one or more packages")
+    print("  list                       List installed packages")
+    print("  setup                      Set up MATLAB integration")
+    print("  find-name-collisions       Find symbol name collisions across packages")
     print()
     print("Examples:")
     print("  mip install mypackage")
+    print("  mip install package1 package2 package3")
     print("  mip install package.mhl")
     print("  mip install https://example.com/package.mhl")
     print("  mip uninstall mypackage")
+    print("  mip uninstall package1 package2 package3")
     print("  mip list")
     print("  mip setup")
     print("  mip find-name-collisions")
@@ -33,19 +35,19 @@ def main():
     
     if command == 'install':
         if len(sys.argv) < 3:
-            print("Error: Package name required")
-            print("Usage: mip install <package>")
+            print("Error: At least one package name required")
+            print("Usage: mip install <package1> [package2] ...")
             sys.exit(1)
-        package_name = sys.argv[2]
-        install_package(package_name)
+        package_names = sys.argv[2:]
+        install_package(package_names)
     
     elif command == 'uninstall':
         if len(sys.argv) < 3:
-            print("Error: Package name required")
-            print("Usage: mip uninstall <package>")
+            print("Error: At least one package name required")
+            print("Usage: mip uninstall <package1> [package2] ...")
             sys.exit(1)
-        package_name = sys.argv[2]
-        uninstall_package(package_name)
+        package_names = sys.argv[2:]
+        uninstall_package(package_names)
     
     elif command == 'list':
         list_packages()

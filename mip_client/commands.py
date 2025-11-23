@@ -107,6 +107,46 @@ def _build_dependency_graph(package_name, index, visited=None, path=None):
     return result
 
 
+def _topological_sort_packages(package_names, package_info_map):
+    """Sort packages in topological order (dependencies first)
+    
+    Args:
+        package_names: List of package names to sort
+        package_info_map: Dictionary mapping package names to their info
+    
+    Returns:
+        List of package names in topological order
+    """
+    # Build adjacency list (package -> list of packages it depends on)
+    dependencies = {}
+    for pkg_name in package_names:
+        pkg_info = package_info_map.get(pkg_name)
+        if pkg_info:
+            dependencies[pkg_name] = pkg_info.get('dependencies', [])
+        else:
+            dependencies[pkg_name] = []
+    
+    # Topological sort using DFS
+    visited = set()
+    result = []
+    
+    def visit(pkg_name):
+        if pkg_name in visited:
+            return
+        visited.add(pkg_name)
+        
+        # Visit dependencies first
+        for dep in dependencies.get(pkg_name, []):
+            if dep in package_names:  # Only visit if it's in our list
+                visit(dep)
+        
+        result.append(pkg_name)
+    
+    for pkg_name in package_names:
+        visit(pkg_name)
+    
+    return result
+
 def _download_and_install(package_name, package_info, mip_dir):
     """Download and install a single package
     
@@ -120,7 +160,7 @@ def _download_and_install(package_name, package_info, mip_dir):
     # Get filename
     mhl_url = package_info['mhl_url']
     
-    print(f"Downloading {package_name} v{package_info['version']}...")
+    print(f"Downloading {package_name} {package_info['version']}...")
     
     # Create temporary file for download
     mhl_path = mip_dir / f"{package_name}.mhl"
@@ -234,11 +274,13 @@ def _install_from_mhl(mhl_source, mip_dir):
         
         print(f"Successfully installed '{package_name}'")
 
-def install_package(package_name):
-    """Install a package from the mip repository, local .mhl file, or URL
+def install_package(package_names):
+    """Install one or more packages from the mip repository, local .mhl files, or URLs
     
     Args:
-        package_name: Name of the package to install, path to local .mhl file, or URL to .mhl file
+        package_names: Package name(s) to install. Can be:
+                      - A single string (package name, .mhl file path, or URL)
+                      - A list of strings (multiple packages)
     """
     # Ensure MATLAB integration is up to date
     _ensure_mip_matlab_setup()
@@ -246,68 +288,132 @@ def install_package(package_name):
     mip_dir = get_mip_dir()
     mip_dir.mkdir(parents=True, exist_ok=True)
     
-    # Check if this is a local .mhl file or URL
-    if package_name.endswith('.mhl'):
-        _install_from_mhl(package_name, mip_dir)
-        return
+    # Normalize input to a list
+    if isinstance(package_names, str):
+        package_names = [package_names]
     
-    # Otherwise, proceed with remote repository installation
-
-    # Download and parse the package index
-    index_url = "https://mip-org.github.io/mip-core/index.json"
-    print(f"Fetching package index...")
+    # Separate packages by type
+    repo_packages = []
+    mhl_sources = []
     
-    try:
-        # Download index
-        with request.urlopen(index_url) as response:
-            index_content = response.read().decode('utf-8')
-
-        # Parse JSON
-        index = json.loads(index_content)
-
-        # Build dependency graph (returns packages in install order)
-        print(f"Resolving dependencies for '{package_name}'...")
-        install_order = _build_dependency_graph(package_name, index)
-        
-        # Filter out already installed packages
-        to_install = []
-        package_info_map = {pkg['name']: pkg for pkg in index.get('packages', [])}
-
-        for pkg_name in install_order:
-            package_dir = mip_dir / pkg_name
-            if package_dir.exists():
-                print(f"Package '{pkg_name}' is already installed")
+    for pkg in package_names:
+        if pkg.endswith('.mhl'):
+            mhl_sources.append(pkg)
+        else:
+            repo_packages.append(pkg)
+    
+    # Phase 1: Validate and plan installations
+    all_packages_to_install = []
+    package_info_map = {}
+    
+    # Handle repository packages
+    if repo_packages:
+        try:
+            # Download and parse the package index once
+            index_url = "https://mip-org.github.io/mip-core/index.json"
+            print(f"Fetching package index...")
+            
+            with request.urlopen(index_url) as response:
+                index_content = response.read().decode('utf-8')
+            
+            index = json.loads(index_content)
+            package_info_map = {pkg['name']: pkg for pkg in index.get('packages', [])}
+            
+            # Resolve dependencies for all requested packages
+            if len(repo_packages) == 1:
+                print(f"Resolving dependencies for '{repo_packages[0]}'...")
             else:
-                to_install.append(pkg_name)
-        
-        if not to_install:
-            print(f"All packages already installed")
-            return
-        
-        # Show installation plan
-        if len(to_install) > 1:
+                print(f"Resolving dependencies for {len(repo_packages)} packages...")
+            
+            # Build combined dependency graph
+            all_required = set()
+            for pkg_name in repo_packages:
+                install_order = _build_dependency_graph(pkg_name, index)
+                all_required.update(install_order)
+            
+            # Convert to list and sort topologically
+            # We need to rebuild the order considering all packages together
+            all_packages_to_install = _topological_sort_packages(list(all_required), package_info_map)
+            
+        except HTTPError as e:
+            print(f"Error: Could not download package index (HTTP {e.code})")
+            sys.exit(1)
+        except URLError as e:
+            print(f"Error: Could not connect to package repository: {e.reason}")
+            sys.exit(1)
+        except Exception as e:
+            print(f"Error: Failed to resolve dependencies: {e}")
+            sys.exit(1)
+    
+    # Handle .mhl file installations
+    # For .mhl files, we'll install them after repo packages
+    # since they might depend on repo packages
+    for mhl_source in mhl_sources:
+        # Note: .mhl installations will handle their own dependencies
+        # by calling install_package recursively if needed
+        pass
+    
+    # Filter out already installed packages (repo packages only)
+    to_install = []
+    already_installed = []
+    
+    for pkg_name in all_packages_to_install:
+        package_dir = mip_dir / pkg_name
+        if package_dir.exists():
+            already_installed.append(pkg_name)
+        else:
+            to_install.append(pkg_name)
+    
+    # Report already installed packages
+    if already_installed:
+        for pkg_name in already_installed:
+            print(f"Package '{pkg_name}' is already installed")
+    
+    # Show installation plan
+    if to_install:
+        if len(to_install) == 1:
             print(f"\nInstallation plan:")
-            for pkg_name in to_install:
-                pkg_info = package_info_map[pkg_name]
-                print(f"  - {pkg_name} v{pkg_info['version']}")
-            print()
+        else:
+            print(f"\nInstallation plan ({len(to_install)} packages):")
         
-        # Install each package in order
+        for pkg_name in to_install:
+            pkg_info = package_info_map[pkg_name]
+            # Show which requested packages require this one
+            required_by = []
+            for requested in repo_packages:
+                if requested != pkg_name:
+                    deps = _build_dependency_graph(requested, index)
+                    if pkg_name in deps:
+                        required_by.append(requested)
+            
+            if pkg_name in repo_packages:
+                print(f"  - {pkg_name} {pkg_info['version']}")
+            elif required_by:
+                print(f"  - {pkg_name} {pkg_info['version']} (required by {', '.join(required_by)})")
+            else:
+                print(f"  - {pkg_name} {pkg_info['version']}")
+        print()
+    
+    # Phase 2: Execute installations
+    installed_count = 0
+    
+    # Install repository packages
+    if to_install:
         for pkg_name in to_install:
             pkg_info = package_info_map[pkg_name]
             _download_and_install(pkg_name, pkg_info, mip_dir)
-        
-        print(f"\nSuccessfully installed {len(to_install)} package(s)")
-        
-    except HTTPError as e:
-        print(f"Error: Could not download (HTTP {e.code})")
-        sys.exit(1)
-    except URLError as e:
-        print(f"Error: Could not connect to package repository: {e.reason}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"Error: Failed to install package '{package_name}': {e}")
-        sys.exit(1)
+            installed_count += 1
+    
+    # Install .mhl files
+    for mhl_source in mhl_sources:
+        _install_from_mhl(mhl_source, mip_dir)
+        installed_count += 1
+    
+    # Summary
+    if installed_count == 0 and not mhl_sources:
+        print(f"All packages already installed")
+    elif installed_count > 0:
+        print(f"\nSuccessfully installed {installed_count} package(s)")
 
 
 def _read_package_dependencies(package_dir):
@@ -381,53 +487,142 @@ def _find_reverse_dependencies(package_name, mip_dir, visited=None):
     
     return reverse_deps
 
-def uninstall_package(package_name):
-    """Uninstall a package and all packages that depend on it"""
+def _build_uninstall_order(packages_to_uninstall, mip_dir):
+    """Sort packages in reverse topological order for uninstallation
+    
+    Packages with reverse dependencies should be uninstalled first,
+    then packages they depend on.
+    
+    Args:
+        packages_to_uninstall: Set of package names to uninstall
+        mip_dir: The mip directory path
+    
+    Returns:
+        List of package names in uninstallation order
+    """
+    # Build dependency graph for packages to uninstall
+    dependencies = {}
+    for pkg_name in packages_to_uninstall:
+        pkg_dir = mip_dir / pkg_name
+        dependencies[pkg_name] = _read_package_dependencies(pkg_dir)
+    
+    # Topological sort - but we want reverse order for uninstallation
+    # (packages with no dependents first, then their dependencies)
+    visited = set()
+    result = []
+    
+    def visit(pkg_name):
+        if pkg_name in visited:
+            return
+        visited.add(pkg_name)
+        
+        # Visit packages that depend on this one first (from our uninstall set)
+        for other_pkg in packages_to_uninstall:
+            if other_pkg != pkg_name and pkg_name in dependencies.get(other_pkg, []):
+                visit(other_pkg)
+        
+        result.append(pkg_name)
+    
+    for pkg_name in packages_to_uninstall:
+        visit(pkg_name)
+    
+    return result
+
+def uninstall_package(package_names):
+    """Uninstall one or more packages and all packages that depend on them
+    
+    Args:
+        package_names: Package name(s) to uninstall. Can be:
+                      - A single string (package name)
+                      - A list of strings (multiple packages)
+    """
     # Ensure MATLAB integration is up to date
     _ensure_mip_matlab_setup()
     
     mip_dir = get_mip_dir()
-    package_dir = mip_dir / package_name
     
-    # Check if package is installed
-    if not package_dir.exists():
-        print(f"Package '{package_name}' is not installed")
+    # Normalize input to a list
+    if isinstance(package_names, str):
+        package_names = [package_names]
+    
+    # Phase 1: Validate and build uninstallation plan
+    
+    # Check which requested packages are installed
+    not_installed = []
+    requested_packages = []
+    
+    for pkg_name in package_names:
+        package_dir = mip_dir / pkg_name
+        if not package_dir.exists():
+            not_installed.append(pkg_name)
+        else:
+            requested_packages.append(pkg_name)
+    
+    # Report packages that aren't installed
+    if not_installed:
+        for pkg_name in not_installed:
+            print(f"Package '{pkg_name}' is not installed")
+    
+    # If no valid packages to uninstall, return
+    if not requested_packages:
         return
     
-    # Find all packages that depend on this package
-    print(f"Scanning for packages that depend on '{package_name}'...")
-    reverse_deps = _find_reverse_dependencies(package_name, mip_dir)
+    # Find all packages that depend on any of the requested packages
+    if len(requested_packages) == 1:
+        print(f"Scanning for packages that depend on '{requested_packages[0]}'...")
+    else:
+        print(f"Scanning for packages that depend on {len(requested_packages)} packages...")
     
-    # Build the complete uninstall list
-    to_uninstall = []
+    all_to_uninstall = set(requested_packages)
     
-    # Add reverse dependencies first (they need to be uninstalled before their dependencies)
-    if reverse_deps:
-        # Remove duplicates while preserving order
-        seen = set()
-        unique_reverse_deps = []
-        for dep in reverse_deps:
-            if dep not in seen:
-                seen.add(dep)
-                unique_reverse_deps.append(dep)
-        to_uninstall.extend(unique_reverse_deps)
+    for pkg_name in requested_packages:
+        reverse_deps = _find_reverse_dependencies(pkg_name, mip_dir)
+        all_to_uninstall.update(reverse_deps)
     
-    # Add the target package last
-    to_uninstall.append(package_name)
+    # Sort packages in proper uninstallation order
+    to_uninstall = _build_uninstall_order(all_to_uninstall, mip_dir)
     
     # Display uninstallation plan
     if len(to_uninstall) > 1:
         print(f"\nThe following packages will be uninstalled:")
+        
         for pkg in to_uninstall:
-            if pkg == package_name:
+            if pkg in requested_packages:
                 print(f"  - {pkg}")
             else:
-                print(f"  - {pkg} (depends on {package_name})")
+                # Find which requested packages this depends on
+                depends_on = []
+                pkg_deps = _read_package_dependencies(mip_dir / pkg)
+                for requested in requested_packages:
+                    if requested in pkg_deps:
+                        depends_on.append(requested)
+                    else:
+                        # Check transitive dependencies
+                        all_deps = set()
+                        to_check = list(pkg_deps)
+                        checked = set()
+                        while to_check:
+                            dep = to_check.pop(0)
+                            if dep in checked or dep not in all_to_uninstall:
+                                continue
+                            checked.add(dep)
+                            all_deps.add(dep)
+                            dep_dir = mip_dir / dep
+                            if dep_dir.exists():
+                                to_check.extend(_read_package_dependencies(dep_dir))
+                        
+                        if requested in all_deps:
+                            depends_on.append(requested)
+                
+                if depends_on:
+                    print(f"  - {pkg} (depends on {', '.join(depends_on)})")
+                else:
+                    print(f"  - {pkg}")
         print()
     
     # Confirm uninstallation
     if len(to_uninstall) == 1:
-        response = input(f"Are you sure you want to uninstall '{package_name}'? (y/n): ")
+        response = input(f"Are you sure you want to uninstall '{to_uninstall[0]}'? (y/n): ")
     else:
         response = input(f"Are you sure you want to uninstall these {len(to_uninstall)} packages? (y/n): ")
     
@@ -435,8 +630,10 @@ def uninstall_package(package_name):
         print("Uninstallation cancelled")
         return
     
-    # Uninstall all packages
+    # Phase 2: Execute uninstallations
     print()
+    uninstalled_count = 0
+    
     for pkg in to_uninstall:
         pkg_dir = mip_dir / pkg
         if pkg_dir.exists():
@@ -444,11 +641,12 @@ def uninstall_package(package_name):
                 print(f"Uninstalling '{pkg}'...")
                 shutil.rmtree(pkg_dir)
                 print(f"Successfully uninstalled '{pkg}'")
+                uninstalled_count += 1
             except Exception as e:
                 print(f"Error: Failed to uninstall package '{pkg}': {e}")
                 sys.exit(1)
     
-    print(f"\nSuccessfully uninstalled {len(to_uninstall)} package(s)")
+    print(f"\nSuccessfully uninstalled {uninstalled_count} package(s)")
 
 
 def list_packages():
@@ -481,7 +679,7 @@ def list_packages():
             
             # Display package with version if available
             if version:
-                print(f"  - {package} (v{version})")
+                print(f"  - {package} ({version})")
             else:
                 print(f"  - {package}")
 
