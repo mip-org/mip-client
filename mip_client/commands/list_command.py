@@ -1,11 +1,11 @@
 """List installed packages command"""
 
 import json
-from .utils import get_mip_dir
+from .utils import get_mip_packages_dir
 
 def list_packages():
     """List all installed packages with their versions"""
-    mip_dir = get_mip_dir()
+    mip_dir = get_mip_packages_dir()
     
     if not mip_dir.exists():
         print("No packages installed yet")

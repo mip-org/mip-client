@@ -3,7 +3,7 @@
 import sys
 import shutil
 
-from .utils import get_mip_dir
+from .utils import get_mip_packages_dir
 from .matlab_integration import _ensure_mip_matlab_setup
 from .package_info import _read_package_dependencies
 from .dependency_graph import _find_reverse_dependencies, _build_uninstall_order
@@ -19,7 +19,7 @@ def uninstall_package(package_names):
     # Ensure MATLAB integration is up to date
     _ensure_mip_matlab_setup()
     
-    mip_dir = get_mip_dir()
+    mip_dir = get_mip_packages_dir()
     
     # Normalize input to a list
     if isinstance(package_names, str):

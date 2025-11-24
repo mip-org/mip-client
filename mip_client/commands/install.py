@@ -9,7 +9,7 @@ from pathlib import Path
 from urllib import request
 from urllib.error import URLError, HTTPError
 
-from .utils import get_mip_dir
+from .utils import get_mip_packages_dir
 from .matlab_integration import _ensure_mip_matlab_setup
 from .dependency_graph import _build_dependency_graph, _topological_sort_packages
 from .platform_utils import (
@@ -153,7 +153,7 @@ def install_package(package_names):
     # Ensure MATLAB integration is up to date
     _ensure_mip_matlab_setup()
     
-    mip_dir = get_mip_dir()
+    mip_dir = get_mip_packages_dir()
     mip_dir.mkdir(parents=True, exist_ok=True)
     
     # Normalize input to a list

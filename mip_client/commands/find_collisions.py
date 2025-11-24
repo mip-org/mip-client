@@ -1,11 +1,11 @@
 """Find name collisions command"""
 
 import json
-from .utils import get_mip_dir
+from .utils import get_mip_packages_dir
 
 def find_name_collisions():
     """Find and report name collisions in exposed symbols across all installed packages"""
-    mip_dir = get_mip_dir()
+    mip_dir = get_mip_packages_dir()
     
     if not mip_dir.exists():
         print("No packages installed yet")

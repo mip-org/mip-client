@@ -2,6 +2,7 @@
 
 import shutil
 from pathlib import Path
+from .utils import get_mip_matlab_dir
 
 def _ensure_mip_matlab_setup():
     """Ensure the +mip directory is set up in ~/.mip/matlab
@@ -11,7 +12,7 @@ def _ensure_mip_matlab_setup():
     """
     try:
         # Get the source +mip directory
-        source_plus_mip = Path(__file__).parent.parent / 'matlab' / '+mip'
+        source_plus_mip = get_mip_matlab_dir() / '+mip'
         if not source_plus_mip.exists():
             print("Warning: +mip directory not found in package")
             return
@@ -22,8 +23,7 @@ def _ensure_mip_matlab_setup():
             return
         
         # Destination path in ~/.mip/matlab/+mip
-        home = Path.home()
-        dest_plus_mip = home / '.mip' / 'matlab' / '+mip'
+        dest_plus_mip = get_mip_matlab_dir() / '+mip'
         
         # Create parent directory if it doesn't exist
         dest_plus_mip.parent.mkdir(parents=True, exist_ok=True)
@@ -35,7 +35,7 @@ def _ensure_mip_matlab_setup():
         shutil.copytree(source_plus_mip, dest_plus_mip)
 
         # Copy the mip.m file
-        dest_mip_m = home / '.mip' / 'matlab' / 'mip.m'
+        dest_mip_m = get_mip_matlab_dir() / 'mip.m'
         shutil.copy2(source_mip_m, dest_mip_m)
         
     except Exception as e:
@@ -51,8 +51,8 @@ def setup_matlab():
     _ensure_mip_matlab_setup()
     
     home = Path.home()
-    mip_matlab_dir = home / '.mip' / 'matlab'
-    
+    mip_matlab_dir = get_mip_matlab_dir()
+
     print(f"MATLAB integration updated at: {mip_matlab_dir}")
     print(f"\nMake sure to add '{mip_matlab_dir}' to your MATLAB path.")
     print(f"You can do this by running in MATLAB:")
