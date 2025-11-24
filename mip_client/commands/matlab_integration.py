@@ -12,7 +12,7 @@ def _ensure_mip_matlab_setup():
     """
     try:
         # Get the source +mip directory
-        source_plus_mip = get_mip_matlab_dir() / '+mip'
+        source_plus_mip = Path(__file__).parent.parent / 'matlab' / '+mip'
         if not source_plus_mip.exists():
             print("Warning: +mip directory not found in package")
             return
