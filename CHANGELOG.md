@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## [0.2.0] - 2025-11-24
+
 - Direct/indirect imports and listing imported packages
 - pin/unpin packages and unimport --all
 - rename import -> load, unimport -> unload
