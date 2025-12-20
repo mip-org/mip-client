@@ -3,6 +3,7 @@
 import sys
 import json
 import shutil
+import traceback
 import zipfile
 import tempfile
 from pathlib import Path
@@ -240,12 +241,15 @@ def install_package(package_names):
             all_packages_to_install = _topological_sort_packages(list(all_required), package_info_map)
             
         except HTTPError as e:
+            traceback.print_exc()
             print(f"Error: Could not download package index (HTTP {e.code})")
             sys.exit(1)
         except URLError as e:
+            traceback.print_exc()
             print(f"Error: Could not connect to package repository: {e.reason}")
             sys.exit(1)
         except Exception as e:
+            traceback.print_exc()
             print(f"Error: Failed to resolve dependencies: {e}")
             sys.exit(1)
     

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+## [0.3.2] - 2025-12-20
+
+- platform -> architecture renaming (including mip architecture command)
+
 ## [0.3.1] - 2025-11-27
 
 - Fix bug when installing from local .mhl file

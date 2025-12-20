@@ -103,6 +103,11 @@ def select_best_package_variant(variants, current_architecture=None):
         return None
     
     # Filter to compatible variants only
+    for v in variants:
+        if 'architecture' not in v:
+            print(v)
+            print(f"Warning: Package variant {v.get('name', '<unknown>')} is missing 'architecture' field")
+            v['architecture'] = 'error_missing_field'
     compatible = [v for v in variants if is_architecture_compatible(v['architecture'], current_architecture)]
 
     if not compatible:
